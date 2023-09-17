@@ -48,6 +48,7 @@ func main() {
 	flag.Parse()
 
 	if filename == "" && u == "" {
+    flag.Usage()
 		os.Exit(1)
 	}
 
