@@ -3,8 +3,12 @@ A tool for detecting client side desync based on portswigger research:
 https://portswigger.net/research/browser-powered-desync-attacks
 
 # Installation
+You need `go` and `git` in order to complete installation.
+Type the following into a terminal session:
 ```
-go install -v github.com/bassem-essam/csdesync@latest
+git clone https://github.com/bassem-essam/csdesync
+cd csdesync
+go install .
 ```
 
 # Usage
