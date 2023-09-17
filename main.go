@@ -93,6 +93,7 @@ func main() {
 		lines = lines[:len(lines)-1]
 		input := make(chan string)
 
+		// Initiate workers
 		for i := 0; i < concurrency; i++ {
 			wg.Add(1)
 			go func() {
@@ -103,6 +104,7 @@ func main() {
 			}()
 		}
 
+		// Read lines into the input channel
 		for _, line := range lines {
 			input <- line
 		}
@@ -131,7 +133,7 @@ func addHeaders(r *http.Request, headers map[string]string) {
 }
 
 func detect(u string) {
-	// Prepare follow-up
+	// Prepare the request stub
 	reqStub, err := http.NewRequestWithContext(traceCtx, "GET", u, nil)
 	if err != nil {
 		if verbose {
@@ -159,7 +161,8 @@ func detect(u string) {
 	resOriginal.Body.Close()
 	resOriginalHead, resOriginalBody := splitResponse(d)
 
-	// Prepare probe request
+	// Prepare smuggle request which should cause the difference in the response
+	// to the next request
 	reqSmuggle, err := http.NewRequestWithContext(traceCtx, "POST", u, nil)
 	if err != nil {
 		if verbose {
@@ -178,7 +181,7 @@ func detect(u string) {
 
 	addHeaders(reqSmuggle, headers)
 
-	// Send prober
+	// Send smuggle request
 	resSmuggle, err := client.Do(reqSmuggle)
 	if err != nil {
 		if verbose {
@@ -186,6 +189,7 @@ func detect(u string) {
 		}
 		return
 	}
+	
 	resSmuggleBody, err := io.ReadAll(resSmuggle.Body)
 	if err != nil {
 		if verbose {
@@ -195,6 +199,7 @@ func detect(u string) {
 	}
 	resSmuggle.Body.Close()
 
+	// Send the follow up request (an identical request to the first request)
 	resFollow, err := client.Do(reqStub)
 	if err != nil {
 		if verbose {
@@ -202,6 +207,7 @@ func detect(u string) {
 		}
 		return
 	}
+	
 	defer resFollow.Body.Close()
 
 	d, err = httputil.DumpResponse(resSmuggle, false)
@@ -211,6 +217,7 @@ func detect(u string) {
 		}
 		return
 	}
+	
 	resSmuggleHeaders := string(d)
 
 	d, err = httputil.DumpResponse(resFollow, true)
@@ -238,6 +245,10 @@ func detect(u string) {
 		0644)
 	resFollow.Body.Close()
 
+	// This is how detection is done:
+	// if status codes change while the same request is sent,
+	// then this is because part of the smuggle request (its body) was not processed until
+	// the follow up request reached  the server.
 	if resFollow.StatusCode != resOriginal.StatusCode {
 		fmt.Println(u)
 		outfile.WriteString(u + "\n")
